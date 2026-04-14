@@ -89,10 +89,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return []
     }
 
-    return (data ?? [])
-      .filter((row: { companies: unknown }) => row.companies !== null)
-      .map((row: { role: CompanyRole; companies: { id: string; name: string; document: string | null; logo_url: string | null; is_active: boolean; created_at: string; updated_at: string } }) => ({
-        ...(row.companies as object),
+    return ((data ?? []) as any[])
+      .filter((row: any) => row.companies !== null && !Array.isArray(row.companies))
+      .map((row: any) => ({
+        ...row.companies,
         role: row.role,
       })) as UserCompany[]
   }, [])
