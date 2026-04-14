@@ -1,0 +1,582 @@
+import { useState, useMemo, useEffect } from 'react'
+import {
+  ArrowDownRight, ArrowUpRight, Plus, Filter, MoreVertical,
+  CheckCircle2, Clock, AlertCircle, PiggyBank, Save, X, Info, Expand
+} from 'lucide-react'
+import { Button } from '../components/ui/Button'
+import { formatCurrency } from '../lib/utils'
+import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../lib/supabase'
+import type { Title, TransactionDirection, TransactionStatus, OperationalGroup } from '../types/finance'
+
+const STATUS_STYLES: Record<TransactionStatus, { label: string; dot: string; bg: string; text: string; icon: any }> = {
+  open: { label: 'Em aberto', dot: 'bg-amber-400', bg: 'bg-amber-50', text: 'text-amber-700', icon: Clock },
+  paid: { label: 'Pago', dot: 'bg-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700', icon: CheckCircle2 },
+  partial: { label: 'Parcial', dot: 'bg-blue-400', bg: 'bg-blue-50', text: 'text-blue-700', icon: PiggyBank },
+  overdue: { label: 'Vencido', dot: 'bg-red-500', bg: 'bg-red-50', text: 'text-red-700', icon: AlertCircle },
+  canceled: { label: 'Cancelado', dot: 'bg-stone-300', bg: 'bg-stone-50', text: 'text-stone-500', icon: X },
+}
+
+const TABS: OperationalGroup[] = ['Todos', 'Recebíveis', 'Despesas fixas', 'Despesas variáveis', 'Pessoal', 'Impostos']
+
+const formatShortDate = (isoString: string) => {
+  if (!isoString) return ''
+  const d = new Date(isoString + 'T12:00:00Z')
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+}
+
+function TransactionDetailsModal({
+  transaction,
+  onClose,
+  onSave
+}: {
+  transaction: Partial<Title>
+  onClose: () => void
+  onSave: (updated: Partial<Title>) => Promise<void>
+}) {
+  const [form, setForm] = useState<Partial<Title>>(transaction)
+  const [saving, setSaving] = useState(false)
+
+  const isDraft = form.id === 'draft'
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    await onSave(form)
+    setSaving(false)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-stone-900/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white border border-stone-200 rounded-2xl w-full max-w-2xl shadow-2xl animate-slide-up flex flex-col max-h-[90vh]">
+        
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-5 border-b border-stone-100">
+          <div className="flex items-center gap-2">
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${form.direction === 'receivable' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
+               {form.direction === 'receivable' ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}
+            </div>
+            <h2 className="text-base font-semibold text-stone-900">
+              {isDraft ? 'Novo Lançamento (Rascunho)' : 'Detalhes do Lançamento'}
+            </h2>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="overflow-y-auto p-6">
+          <form id="tx-form" onSubmit={handleSubmit} className="space-y-6">
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-stone-500 mb-1.5">Descrição</label>
+                <input type="text" autoFocus value={form.description || ''} onChange={e => setForm({...form, description: e.target.value})} className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm text-stone-800 focus:outline-none focus:border-stone-400" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-stone-500 mb-1.5">Valor Bruto (Centavos)</label>
+                <input type="number" value={form.amount || ''} onChange={e => setForm({...form, amount: parseInt(e.target.value) || 0})} className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm text-stone-800 font-mono focus:outline-none focus:border-stone-400" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+               <div>
+                <label className="block text-xs font-semibold text-stone-500 mb-1.5">Data de {form.direction === 'receivable' ? 'Recebimento/Vencimento' : 'Vencimento/Pagamento'}</label>
+                <input type="date" value={form.due_date || ''} onChange={e => setForm({...form, due_date: e.target.value})} className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm text-stone-800 focus:outline-none focus:border-stone-400" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-stone-500 mb-1.5">Direção do Lançamento</label>
+                <select value={form.direction} onChange={e => setForm({...form, direction: e.target.value as TransactionDirection})} className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm text-stone-800 focus:outline-none focus:border-stone-400">
+                  <option value="payable">Saída (Despesa)</option>
+                  <option value="receivable">Entrada (Receita)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-stone-500 mb-1.5">Grupo Operacional</label>
+                <select value={form.operational_group || 'Outros'} onChange={e => setForm({...form, operational_group: e.target.value as OperationalGroup})} className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm text-stone-800 focus:outline-none focus:border-stone-400">
+                  {TABS.filter(t => t !== 'Todos').map(t => <option key={t} value={t}>{t}</option>)}
+                  <option value="Outros">Outros</option>
+                  {!form.operational_group && <option value="" disabled hidden>Selecione...</option>}
+                </select>
+              </div>
+            </div>
+
+            <div className="p-4 bg-stone-50 border border-stone-200 rounded-xl space-y-4">
+              <h3 className="text-sm font-medium text-stone-800 flex items-center justify-between">
+                <span className="flex items-center gap-2"><Info size={16} className="text-stone-400" /> Detalhes Estratégicos</span>
+                
+                {/* Permite alterar situação dentro do modal também! */}
+                <select 
+                  value={form.status || 'open'}
+                  onChange={e => setForm({...form, status: e.target.value as TransactionStatus})}
+                  className="bg-white border border-stone-200 text-xs px-2 py-1 rounded text-stone-700 outline-none"
+                >
+                  <option value="open">Em aberto</option>
+                  <option value="paid">{form.direction === 'receivable' ? 'Recebido' : 'Pago'}</option>
+                  <option value="partial">Parcial</option>
+                  <option value="overdue">Vencido</option>
+                  <option value="canceled">Cancelado</option>
+                </select>
+              </h3>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center gap-3">
+                  <input type="checkbox" id="recorrente" checked={form.is_recurring} onChange={e => setForm({...form, is_recurring: e.target.checked})} className="w-4 h-4 rounded border-stone-300 text-stone-900 focus:ring-stone-900" />
+                  <div>
+                    <label htmlFor="recorrente" className="text-sm font-medium text-stone-800 block cursor-pointer">Lançamento Recorrente</label>
+                    <span className="text-xs text-stone-500">Irá repetir na mesma data</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-stone-500 mb-1.5">Dividir valor (Parcelas)</label>
+                  <input type="number" min={1} value={form.installments || 1} onChange={e => setForm({...form, installments: parseInt(e.target.value) || 1})} className="w-full px-3 py-2 bg-white border border-stone-200 rounded-lg text-sm text-stone-800 focus:outline-none focus:border-stone-400" />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-stone-500 mb-1.5">Observações Adicionais</label>
+              <textarea value={form.notes || ''} onChange={e => setForm({...form, notes: e.target.value})} rows={3} placeholder="Fornecedor, CNPJ, Links, Motivos..." className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm text-stone-800 focus:outline-none focus:border-stone-400"></textarea>
+            </div>
+
+          </form>
+        </div>
+
+        {/* Footer */}
+        <div className="p-6 border-t border-stone-100 flex justify-between items-center bg-stone-50 rounded-b-2xl">
+          <span className="text-xs text-stone-400">{isDraft ? 'Salvando criará o item.' : 'Atualização imediata.'}</span>
+          <div className="flex gap-3">
+            <Button variant="secondary" onClick={onClose}>Cancelar</Button>
+            <Button variant="primary" type="submit" form="tx-form" disabled={saving}>
+               {saving ? 'Salvando...' : (isDraft ? 'Salvar Lançamento' : 'Salvar Alterações')}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
+export function TransactionsPage() {
+  const { activeCompany } = useAuth()
+  
+  const [data, setData] = useState<Title[]>([])
+  const [loading, setLoading] = useState(true)
+  
+  // Controls inline creation draft
+  const [isCreating, setIsCreating] = useState(false)
+  const [draftTx, setDraftTx] = useState<Partial<Title> | null>(null)
+  const [savingInline, setSavingInline] = useState(false)
+  
+  const [activeTab, setActiveTab] = useState<OperationalGroup>('Todos')
+  
+  // Selected Tx for Modal (can be a real one OR the draft one)
+  const [selectedTx, setSelectedTx] = useState<Partial<Title> | null>(null)
+
+  const fetchTransactions = async () => {
+    if (!activeCompany) return
+    setLoading(true)
+    const { data: txs, error } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('company_id', activeCompany.id)
+      .order('due_date', { ascending: false })
+      
+    if (!error && txs) setData(txs as Title[])
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    fetchTransactions()
+  }, [activeCompany])
+  
+  const filteredData = useMemo(() => {
+    if (activeTab === 'Todos') return data
+    return data.filter(t => t.operational_group === activeTab)
+  }, [data, activeTab])
+
+  // Contextualize creation draft based on selected tab and trigger
+  useEffect(() => {
+    if (isCreating && !draftTx) {
+      setDraftTx({
+        id: 'draft',
+        direction: activeTab === 'Recebíveis' ? 'receivable' : 'payable',
+        amount: 0,
+        description: '',
+        due_date: new Date().toISOString().split('T')[0],
+        status: 'open',
+        operational_group: activeTab === 'Todos' ? undefined : activeTab, // Empty to force user to choose if 'Todos'
+        is_recurring: false,
+        installments: 1,
+        notes: ''
+      })
+    } else if (!isCreating) {
+      setDraftTx(null)
+    }
+  }, [isCreating, activeTab])
+
+  const updateDraft = (patch: Partial<Title>) => {
+    setDraftTx(prev => prev ? { ...prev, ...patch } : null)
+  }
+
+  const handleSaveDraftToDB = async (payload: Partial<Title>) => {
+    if (!activeCompany) return
+    if ((!payload.description || payload.description.trim() === '') || !payload.amount || payload.amount <= 0 || !payload.due_date) {
+      alert("Para salvar, preencha Vencimento, Descrição e um Valor maior que zero.")
+      return
+    }
+    if (!payload.operational_group) {
+      alert("É obrigatório selecionar o Grupo Operacional.")
+      return
+    }
+    
+    setSavingInline(true)
+    
+    const { data: newRow, error } = await supabase
+      .from('transactions')
+      .insert({
+        company_id: activeCompany.id,
+        description: payload.description,
+        direction: payload.direction,
+        status: payload.status || 'open',
+        amount: payload.amount,
+        due_date: payload.due_date,
+        operational_group: payload.operational_group,
+        is_recurring: payload.is_recurring,
+        installments: payload.installments,
+        notes: payload.notes
+      })
+      .select()
+      .single()
+      
+    setSavingInline(false)
+    if (error) {
+      alert('Erro ao salvar no banco: ' + error.message)
+      return
+    }
+
+    setData([newRow as Title, ...data])
+    setIsCreating(false)
+    setDraftTx(null)
+    setSelectedTx(null) // Ensures modal closes if save was triggered from modal
+  }
+
+  const handleModalSave = async (updated: Partial<Title>) => {
+    if (updated.id === 'draft') {
+      // It's saving the DRAFT mode from the opened modal
+      // Sync it locally to draft in case they cancel later? No, they clicked save.
+      await handleSaveDraftToDB(updated)
+    } else {
+      // It's a real existing transaction
+      if (!updated.id) return
+      const { error } = await supabase
+        .from('transactions')
+        .update({
+           description: updated.description,
+           amount: updated.amount,
+           due_date: updated.due_date,
+           direction: updated.direction,
+           operational_group: updated.operational_group,
+           status: updated.status,
+           is_recurring: updated.is_recurring,
+           installments: updated.installments,
+           notes: updated.notes
+        })
+        .eq('id', updated.id)
+
+      if (error) {
+        alert('Erro ao atualizar: ' + error.message)
+        return
+      }
+      
+      setData(prev => prev.map(t => t.id === updated.id ? { ...t, ...updated } : t))
+      setSelectedTx(null)
+    }
+  }
+
+  const handleUpdateStatus = async (id: string, newStatus: TransactionStatus) => {
+    const { error } = await supabase
+      .from('transactions')
+      .update({ status: newStatus })
+      .eq('id', id)
+
+    if (error) {
+      alert('Erro ao alterar status: ' + error.message)
+      return
+    }
+    setData(prev => prev.map(t => t.id === id ? { ...t, status: newStatus } : t))
+  }
+
+  const summary = useMemo(() => {
+    let payable = 0, receivable = 0, overdue = 0
+    filteredData.forEach(t => {
+      if (t.status === 'canceled') return
+      if (t.direction === 'payable') {
+        if (t.status === 'open' || t.status === 'overdue') payable += t.amount
+        if (t.status === 'overdue') overdue += t.amount
+      } else {
+        if (t.status === 'open' || t.status === 'overdue') receivable += t.amount
+      }
+    })
+    return { payable, receivable, overdue }
+  }, [filteredData])
+
+  return (
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 animate-fade-in pb-20">
+      
+      {/* HEADER */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-display font-bold text-stone-900 tracking-tight">Lançamentos</h1>
+          <p className="text-sm text-stone-500 mt-1">Gerencie suas movimentações financeiras de forma categorizada.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" icon={<Filter size={15}/>}>Filtros Avançados</Button>
+          <Button variant="primary" icon={<Plus size={15}/>} onClick={() => { setIsCreating(true); setSelectedTx(null); }}>
+            Novo Lançamento
+          </Button>
+        </div>
+      </div>
+
+      {/* OPERATIONAL TABS */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide border-b border-stone-200">
+        {TABS.map(tab => (
+          <button
+            key={tab}
+            onClick={() => { setActiveTab(tab); setIsCreating(false); }}
+            className={`whitespace-nowrap px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-[1px] ${
+              activeTab === tab 
+                ? 'border-stone-900 text-stone-900' 
+                : 'border-transparent text-stone-500 hover:text-stone-700 hover:border-stone-300'
+            }`}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+
+      {/* SUMMARY */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-white rounded-xl p-5 border border-stone-200 shadow-sm flex flex-col">
+          <span className="text-xs font-mono uppercase tracking-wider text-stone-400 mb-2">A Pagar</span>
+          <span className="text-2xl font-display font-semibold text-stone-900 tracking-tight">
+            {formatCurrency(summary.payable)}
+          </span>
+        </div>
+        <div className="bg-white rounded-xl p-5 border border-stone-200 shadow-sm flex flex-col">
+          <span className="text-xs font-mono uppercase tracking-wider text-emerald-600/70 mb-2">A Receber</span>
+          <span className="text-2xl font-display font-semibold text-emerald-600 tracking-tight">
+            {formatCurrency(summary.receivable)}
+          </span>
+        </div>
+         <div className="bg-red-50 rounded-xl p-5 border border-red-100 flex flex-col">
+          <span className="text-xs font-mono uppercase tracking-wider text-red-500/80 mb-2">Vencido</span>
+          <span className="text-2xl font-display font-semibold text-red-600 tracking-tight">
+            {formatCurrency(summary.overdue)}
+          </span>
+        </div>
+      </div>
+
+      {/* "SPREADSHEET" LIST */}
+      <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
+        {loading ? (
+          <div className="p-12 pl-4 text-center text-stone-400">Carregando dados operacionais...</div>
+        ) : (
+          <div className="overflow-x-auto overflow-visible">
+            <table className="w-full text-left text-sm whitespace-nowrap">
+              <thead>
+                <tr className="bg-stone-50/50 border-b border-stone-200 text-stone-500 font-medium h-10">
+                  <th className="px-4 py-2 font-medium w-10 text-center">Tipo</th>
+                  <th className="px-4 py-2 font-medium w-32">Vencimento</th>
+                  <th className="px-4 py-2 font-medium min-w-[200px]">Descrição (Click p/ detalhes)</th>
+                  <th className="px-4 py-2 font-medium hidden md:table-cell">Grupo Operacional</th>
+                  <th className="px-4 py-2 font-medium text-right">Valor</th>
+                  <th className="px-4 py-2 font-medium text-center">Situação</th>
+                  <th className="px-4 py-2 font-medium w-10"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stone-100">
+                
+                {/* DRAFT INLINE ROW */}
+                {isCreating && draftTx && (
+                  <tr className="bg-stone-50 focus-within:bg-stone-100/50 transition-colors animate-fade-in group">
+                    <td className="px-4 py-3">
+                      <button 
+                        onClick={() => updateDraft({ direction: draftTx.direction === 'payable' ? 'receivable' : 'payable' })}
+                        className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors ${
+                          draftTx.direction === 'payable' ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'
+                        }`}
+                        title="Alternar tipo"
+                      >
+                        {draftTx.direction === 'payable' ? <ArrowDownRight size={16} /> : <ArrowUpRight size={16} />}
+                      </button>
+                    </td>
+                    <td className="px-4 py-3">
+                      <input 
+                        type="date" 
+                        value={draftTx.due_date || ''}
+                        onChange={e => updateDraft({ due_date: e.target.value })}
+                        className="w-full max-w-[130px] bg-transparent border-b border-transparent focus:border-stone-400 outline-none px-1 py-1 text-sm text-stone-800"
+                      />
+                    </td>
+                    <td className="px-4 py-3 relative">
+                      <div className="flex items-center gap-1 group/desc border-b border-transparent focus-within:border-stone-400">
+                        <input 
+                          type="text" 
+                          autoFocus
+                          placeholder="Descrição rápida..." 
+                          value={draftTx.description || ''}
+                          onChange={e => updateDraft({ description: e.target.value })}
+                          className="w-full bg-transparent outline-none px-1 py-1 text-sm text-stone-800"
+                        />
+                        <button 
+                          onClick={() => setSelectedTx(draftTx)}
+                          className="p-1 rounded text-stone-400 hover:bg-stone-200 hover:text-stone-700 bg-stone-100 transition-colors z-10"
+                          title="Abrir Detalhamento Rico"
+                        >
+                          <Expand size={14} />
+                        </button>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 hidden md:table-cell">
+                      {activeTab === 'Todos' ? (
+                        <select 
+                          value={draftTx.operational_group || ''}
+                          onChange={e => updateDraft({ operational_group: e.target.value as OperationalGroup })}
+                          className="bg-white border border-stone-200 text-xs px-2 py-1 rounded text-stone-700 outline-none w-32"
+                        >
+                          <option value="" disabled hidden>Selecione...</option>
+                          {TABS.filter(t => t !== 'Todos').map(t => <option key={t} value={t}>{t}</option>)}
+                          <option value="Outros">Outros</option>
+                        </select>
+                      ) : (
+                        <span className="px-2 py-1 bg-stone-100 text-stone-500 rounded text-xs">
+                          {activeTab}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <input 
+                        type="text" 
+                        placeholder="0,00" 
+                        value={draftTx.amount ? draftTx.amount.toString() : ''}
+                        onChange={e => updateDraft({ amount: parseInt(e.target.value) || 0 })}
+                        onKeyDown={e => e.key === 'Enter' && handleSaveDraftToDB(draftTx)}
+                        className="w-24 text-right bg-transparent border-b border-transparent focus:border-stone-400 outline-none px-1 py-1 text-sm font-mono font-medium text-stone-800"
+                      />
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium bg-stone-200 text-stone-600">
+                        {draftTx.status === 'paid' ? 'Pago/Recebido' : 'Pendente'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <button onClick={() => setIsCreating(false)} className="p-1 text-stone-400 hover:text-stone-600 rounded">
+                          <X size={16} />
+                        </button>
+                        <button onClick={() => handleSaveDraftToDB(draftTx)} className="p-1 text-emerald-600 hover:text-emerald-700 bg-emerald-50 rounded" disabled={savingInline}>
+                          <Save size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+  
+                {/* DATA ROWS */}
+                {filteredData.map((row) => {
+                  const s = STATUS_STYLES[row.status]
+                  const isReceivable = row.direction === 'receivable'
+                  return (
+                    <tr key={row.id} className="group hover:bg-stone-50/80 transition-colors">
+                      <td className="px-4 py-3 text-center">
+                        <div className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-stone-50 group-hover:bg-white border border-stone-100">
+                          {isReceivable 
+                            ? <ArrowUpRight size={16} className="text-emerald-500" />
+                            : <ArrowDownRight size={16} className="text-red-400" />
+                          }
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                         <span className={`text-stone-600 ${row.status === 'overdue' ? 'text-red-600 font-semibold' : ''}`}>
+                           {formatShortDate(row.due_date)}
+                         </span>
+                      </td>
+                      <td 
+                        className="px-4 py-3 font-medium text-stone-800 cursor-pointer hover:bg-stone-100 rounded transition-colors group/desc" 
+                        title="Clique p/ editar detalhes ricos"
+                        onClick={() => setSelectedTx(row)}
+                      >
+                         <div className="flex items-center justify-between w-full">
+                           <span className="truncate max-w-[200px]">{row.description}</span>
+                           <Expand size={14} className="text-stone-400 opacity-0 group-hover/desc:opacity-100 transition-opacity" />
+                         </div>
+                      </td>
+                      <td className="px-4 py-3 text-stone-500 hidden md:table-cell truncate max-w-[150px]">
+                        {row.operational_group || '-'}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <span className={`font-mono font-medium ${isReceivable ? 'text-stone-900' : 'text-stone-900'}`}>
+                          {formatCurrency(row.amount)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-center relative group/status">
+                           {/* Status Editor Inline */}
+                           <div className="relative">
+                            <select 
+                              title="Alterar Situação"
+                              value={row.status}
+                              onChange={e => handleUpdateStatus(row.id, e.target.value as TransactionStatus)}
+                              className={`appearance-none cursor-pointer inline-flex items-center gap-1.5 pl-6 pr-4 py-0.5 rounded-md text-xs font-medium focus:outline-none focus:ring-2 focus:ring-stone-400 transition-colors ${s.bg} ${s.text}`}
+                            >
+                              <option value="open">Em aberto</option>
+                              <option value="paid">{isReceivable ? 'Recebido' : 'Pago'}</option>
+                              <option value="partial">Parcial</option>
+                              <option value="overdue">Vencido</option>
+                              <option value="canceled">Cancelado</option>
+                            </select>
+                            <span className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full pointer-events-none ${s.dot}`} />
+                           </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button onClick={() => setSelectedTx(row)} className="text-stone-400 hover:text-stone-700 opacity-0 group-hover:opacity-100 transition-opacity p-1">
+                          <MoreVertical size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
+                
+                {filteredData.length === 0 && !isCreating && !loading && (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-12 text-center text-stone-500">
+                      <p>Nenhum lançamento operacional neste grupo.</p>
+                      <Button variant="primary" className="mt-4" onClick={() => setIsCreating(true)}>
+                        Criar Lançamento
+                      </Button>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* MODAL DE DETALHES CLICÁVEIS */}
+      {selectedTx && (
+        <TransactionDetailsModal 
+          transaction={selectedTx} 
+          onClose={() => setSelectedTx(null)} 
+          onSave={handleModalSave}
+        />
+      )}
+
+    </div>
+  )
+}
