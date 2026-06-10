@@ -66,7 +66,7 @@ export function LoginPage() {
         </div>
 
         {/* Form Card */}
-        <div className="bg-white rounded-2xl border border-stone-200 shadow-sm shadow-stone-100 p-8">
+        <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm shadow-stone-100 sm:p-8">
           <div className="mb-6">
             <h2 className="text-lg font-semibold text-stone-900">Entrar na sua conta</h2>
             <p className="text-sm text-stone-400 mt-0.5">Informe suas credenciais para continuar</p>

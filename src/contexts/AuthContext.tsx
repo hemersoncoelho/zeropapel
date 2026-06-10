@@ -2,6 +2,7 @@ import React, {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   useCallback,
 } from 'react'
@@ -48,6 +49,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [companies, setCompanies] = useState<UserCompany[]>([])
   const [activeCompany, setActiveCompanyState] = useState<UserCompany | null>(null)
   const [companyRole, setCompanyRole] = useState<CompanyRole | null>(null)
+
+  // Ref to read current sessionState inside event callbacks without stale closure
+  const sessionStateRef = useRef<SessionState>('loading')
+  sessionStateRef.current = sessionState
 
   // ── Fetch profile ────────────────────────────────────────
   const fetchProfile = useCallback(async (userId: string) => {
@@ -174,25 +179,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return
     }
 
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
-      initializeFromSession(initialSession)
-    })
-
-    // Listen for auth changes
+    // onAuthStateChange fires INITIAL_SESSION immediately on registration (Supabase JS v2),
+    // so we don't need a separate getSession() call. Calling getSession() concurrently
+    // creates an orphaned auth lock under React StrictMode (double-mount), causing the
+    // 5-second "stuck loading" freeze when returning to the tab.
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+      // TOKEN_REFRESHED: token silently renewed in background — just sync session token
       if (event === 'TOKEN_REFRESHED') {
         setSession(newSession)
+        if (newSession) setUser(newSession.user)
+        return
+      }
+
+      // SIGNED_IN while already authenticated: the tab regained focus and Supabase
+      // re-emits the event after refreshing the token. Re-fetching profile/companies
+      // here would try to acquire the auth lock while it's still held by the refresh
+      // operation, causing a 5-second hang. Just sync the session token instead.
+      if (event === 'SIGNED_IN' && sessionStateRef.current === 'authenticated') {
+        setSession(newSession)
+        if (newSession) setUser(newSession.user)
         return
       }
 
       if (event === 'SIGNED_OUT') {
         localStorage.removeItem(ACTIVE_COMPANY_KEY)
-        setSessionState('unauthenticated')
+        await initializeFromSession(null)
+        return
       }
 
+      // INITIAL_SESSION, first SIGNED_IN, PASSWORD_RECOVERY, USER_UPDATED → full init
       await initializeFromSession(newSession)
     })
 

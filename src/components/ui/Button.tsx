@@ -19,10 +19,11 @@ const variantClasses: Record<Variant, string> = {
   danger:    'bg-red-600 text-white hover:bg-red-700 shadow-sm',
 }
 
+/* Mobile-first: larger touch targets by default; compact from sm breakpoint up */
 const sizeClasses: Record<Size, string> = {
-  sm: 'h-8  px-3 text-xs gap-1.5',
-  md: 'h-9  px-4 text-sm gap-2',
-  lg: 'h-11 px-6 text-sm gap-2',
+  sm: 'min-h-[44px] h-11 px-4 text-sm gap-2 sm:min-h-0 sm:h-8 sm:px-3 sm:text-xs sm:gap-1.5',
+  md: 'min-h-[44px] h-11 px-5 text-base gap-2 sm:min-h-0 sm:h-9 sm:px-4 sm:text-sm',
+  lg: 'min-h-[48px] h-12 px-6 text-base gap-2 sm:min-h-0 sm:h-11 sm:px-6 sm:text-sm',
 }
 
 export function Button({

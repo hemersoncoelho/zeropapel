@@ -63,6 +63,19 @@ export function getInitials(name: string): string {
  * Format CNPJ for display
  * e.g. "12345678000195" → "12.345.678/0001-95"
  */
+/**
+ * Compact currency for chart axis labels
+ * e.g. 150000000 → "R$ 1,5M" | 1500000 → "R$ 15k"
+ */
+export function formatCurrencyShort(centavos: number): string {
+  const reais = centavos / 100
+  if (Math.abs(reais) >= 1_000_000)
+    return `R$ ${(reais / 1_000_000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}M`
+  if (Math.abs(reais) >= 1_000)
+    return `R$ ${(reais / 1_000).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}k`
+  return `R$ ${reais.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`
+}
+
 export function formatDocument(doc: string): string {
   const digits = doc.replace(/\D/g, '')
   if (digits.length === 14) {

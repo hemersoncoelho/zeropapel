@@ -29,7 +29,7 @@ function StatCard({ label, value, icon: Icon, color }: {
   label: string; value: string | number; icon: React.ElementType; color: string
 }) {
   return (
-    <div className="bg-white/[0.04] border border-white/[0.07] rounded-xl p-5 flex items-center gap-4">
+    <div className="flex min-w-0 items-center gap-4 rounded-xl border border-white/[0.07] bg-white/[0.04] p-5">
       <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${color}`}>
         <Icon size={18} className="text-white" />
       </div>
@@ -72,25 +72,27 @@ export function AdminCompaniesPage() {
   }), [companies])
 
   return (
-    <div className="min-h-full p-6 max-w-7xl mx-auto animate-fade-in">
+    <div className="mx-auto min-h-full max-w-7xl animate-fade-in px-4 py-6 sm:px-6">
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-display font-bold text-white tracking-tight">Empresas</h1>
-          <p className="text-sm text-stone-500 mt-0.5">Gestão de todas as empresas cadastradas na plataforma</p>
+      <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl font-display font-bold tracking-tight text-white sm:text-2xl">Empresas</h1>
+          <p className="mt-0.5 text-sm text-stone-500">Gestão de todas as empresas cadastradas na plataforma</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
           <button
+            type="button"
             onClick={refreshCompanies}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-stone-300 hover:text-white hover:bg-white/[0.1] transition-all text-sm"
+            className="flex min-h-[48px] items-center justify-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.06] px-4 py-2.5 text-sm text-stone-300 transition-all hover:bg-white/[0.1] hover:text-white sm:min-h-0 sm:py-2"
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             Atualizar
           </button>
           <button
+            type="button"
             onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white transition-all text-sm font-semibold shadow-lg shadow-rose-900/30"
+            className="flex min-h-[48px] items-center justify-center gap-2 rounded-lg bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-rose-900/30 transition-all hover:bg-rose-700 sm:min-h-0 sm:py-2"
           >
             <Plus size={14} />
             Nova Empresa
@@ -99,7 +101,7 @@ export function AdminCompaniesPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-4 mb-8">
+      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total de empresas" value={stats.total} icon={Building2} color="bg-stone-600" />
         <StatCard label="Empresas ativas" value={stats.active} icon={CheckCircle2} color="bg-emerald-700" />
         <StatCard label="Planos pagos" value={stats.pro} icon={TrendingUp} color="bg-rose-700" />
@@ -107,26 +109,27 @@ export function AdminCompaniesPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-3 mb-5">
+      <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center">
         {/* Search */}
-        <div className="flex-1 relative">
+        <div className="relative min-w-0 flex-1">
           <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-500" />
           <input
             type="text"
             placeholder="Buscar por nome ou CNPJ..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2.5 bg-white/[0.05] border border-white/[0.08] rounded-lg text-sm text-white placeholder-stone-600 focus:outline-none focus:border-rose-500/50 focus:bg-white/[0.07] transition-all"
+            className="min-h-[48px] w-full rounded-lg border border-white/[0.08] bg-white/[0.05] py-2.5 pl-9 pr-4 text-base text-white placeholder-stone-600 transition-all focus:border-rose-500/50 focus:bg-white/[0.07] focus:outline-none sm:min-h-0 sm:text-sm"
           />
         </div>
 
         {/* Plan filter */}
-        <div className="flex gap-1 bg-white/[0.04] border border-white/[0.06] rounded-lg p-1">
+        <div className="flex flex-wrap gap-1 rounded-lg border border-white/[0.06] bg-white/[0.04] p-1">
           {PLANS.map(p => (
             <button
               key={p}
+              type="button"
               onClick={() => setFilterPlan(p)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all capitalize ${
+              className={`min-h-[40px] rounded-md px-3 py-2 text-xs font-medium capitalize transition-all sm:min-h-0 sm:py-1.5 ${
                 filterPlan === p
                   ? 'bg-rose-600 text-white'
                   : 'text-stone-400 hover:text-white'
@@ -138,12 +141,13 @@ export function AdminCompaniesPage() {
         </div>
 
         {/* Active filter */}
-        <div className="flex gap-1 bg-white/[0.04] border border-white/[0.06] rounded-lg p-1">
+        <div className="flex flex-wrap gap-1 rounded-lg border border-white/[0.06] bg-white/[0.04] p-1">
           {(['all', 'active', 'inactive'] as const).map(s => (
             <button
               key={s}
+              type="button"
               onClick={() => setFilterActive(s)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+              className={`min-h-[40px] rounded-md px-3 py-2 text-xs font-medium transition-all sm:min-h-0 sm:py-1.5 ${
                 filterActive === s
                   ? 'bg-white/[0.12] text-white'
                   : 'text-stone-400 hover:text-white'
@@ -164,9 +168,11 @@ export function AdminCompaniesPage() {
       )}
 
       {/* Table */}
-      <div className="bg-white/[0.03] border border-white/[0.07] rounded-xl overflow-hidden">
+      <div className="overflow-hidden rounded-xl border border-white/[0.07] bg-white/[0.03]">
+        <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+          <div className="min-w-[640px]">
         {/* Header row */}
-        <div className="grid grid-cols-[1fr_140px_100px_80px_80px] gap-4 px-5 py-3 border-b border-white/[0.05]">
+        <div className="grid grid-cols-[1fr_140px_100px_80px_80px] gap-4 border-b border-white/[0.05] px-5 py-3">
           {['Empresa', 'Plano', 'Membros', 'Status', ''].map((h, i) => (
             <span key={i} className="text-[11px] font-mono uppercase tracking-widest text-stone-600">{h}</span>
           ))}
@@ -193,6 +199,8 @@ export function AdminCompaniesPage() {
             ))}
           </div>
         )}
+          </div>
+        </div>
       </div>
 
       {!loading && filtered.length > 0 && (
@@ -211,8 +219,9 @@ export function AdminCompaniesPage() {
 function CompanyRow({ company, onClick }: { company: AdminCompany; onClick: () => void }) {
   return (
     <button
+      type="button"
       onClick={onClick}
-      className="w-full grid grid-cols-[1fr_140px_100px_80px_80px] gap-4 px-5 py-4 hover:bg-white/[0.04] transition-all group text-left items-center"
+      className="group grid w-full grid-cols-[1fr_140px_100px_80px_80px] items-center gap-4 px-5 py-4 text-left transition-all hover:bg-white/[0.04]"
     >
       {/* Name */}
       <div className="flex items-center gap-3 min-w-0">

@@ -17,6 +17,13 @@ import { LoginPage } from './pages/LoginPage'
 import { SelectCompanyPage } from './pages/SelectCompanyPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { TransactionsPage } from './pages/TransactionsPage'
+import { AccountsPage } from './pages/AccountsPage'
+import { ContactsPage } from './pages/ContactsPage'
+import { TransfersPage } from './pages/TransfersPage'
+import { ReportsPage } from './pages/ReportsPage'
+import { CategoriesPage } from './pages/CategoriesPage'
+import { UsersPage } from './pages/UsersPage'
+import { SettingsPage } from './pages/SettingsPage'
 import { AdminCompaniesPage } from './pages/admin/AdminCompaniesPage'
 import { AdminCompanyDetailPage } from './pages/admin/AdminCompanyDetailPage'
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage'
@@ -25,7 +32,7 @@ import { AdminMembersPage } from './pages/admin/AdminMembersPage'
 // ── Placeholder pages for nav structure ────────────────────
 function PlaceholderPage({ title }: { title: string }) {
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="mx-auto max-w-7xl min-w-0 px-4 py-6 sm:px-6">
       <div className="mb-6">
         <h2 className="text-xl font-display font-semibold text-stone-900">{title}</h2>
         <p className="text-sm text-stone-400 mt-0.5">Em desenvolvimento — próximo bloco</p>
@@ -103,13 +110,13 @@ function AppRoutes() {
       >
         <Route path="/dashboard"    element={<DashboardPage />} />
         <Route path="/lancamentos"  element={<TransactionsPage />} />
-        <Route path="/accounts"     element={<PlaceholderPage title="Contas Bancárias" />} />
-        <Route path="/contacts"     element={<PlaceholderPage title="Contatos" />} />
-        <Route path="/transfers"    element={<PlaceholderPage title="Transferências" />} />
-        <Route path="/reports"      element={<PlaceholderPage title="Relatórios" />} />
-        <Route path="/categories"   element={<PlaceholderPage title="Categorias" />} />
-        <Route path="/users"        element={<PlaceholderPage title="Usuários" />} />
-        <Route path="/settings"     element={<PlaceholderPage title="Configurações" />} />
+        <Route path="/accounts"     element={<AccountsPage />} />
+        <Route path="/contacts"     element={<ContactsPage />} />
+        <Route path="/transfers"    element={<TransfersPage />} />
+        <Route path="/reports"      element={<ReportsPage />} />
+        <Route path="/categories"   element={<CategoriesPage />} />
+        <Route path="/users"        element={<UsersPage />} />
+        <Route path="/settings"     element={<SettingsPage />} />
       </Route>
 
       {/* Admin platform — protected by AdminRoute */}

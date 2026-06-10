@@ -41,13 +41,14 @@ export function Input({
         <input
           id={inputId}
           className={`
-            w-full h-10 bg-white border rounded-lg text-sm text-stone-900
+            w-full min-h-[44px] h-12 rounded-lg border bg-white px-3 text-base text-stone-900
             placeholder:text-stone-400 transition-all duration-150
             focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500
             disabled:bg-stone-50 disabled:cursor-not-allowed disabled:text-stone-400
+            sm:min-h-0 sm:h-10 sm:text-sm
             ${error ? 'border-red-400 focus:border-red-500 focus:ring-red-500/20' : 'border-stone-300 hover:border-stone-400'}
-            ${icon ? 'pl-10' : 'pl-3'}
-            ${iconRight ? 'pr-10' : 'pr-3'}
+            ${icon ? 'pl-10 sm:pl-10' : 'pl-3'}
+            ${iconRight ? 'pr-10 sm:pr-10' : 'pr-3'}
             ${className}
           `}
           {...props}

@@ -105,8 +105,9 @@ export function SelectCompanyPage() {
               {companies.map(company => (
                 <button
                   key={company.id}
+                  type="button"
                   onClick={() => handleSelectCompany(company)}
-                  className="w-full flex items-center gap-4 px-6 py-4 hover:bg-stone-50 transition-colors group text-left"
+                  className="group flex w-full flex-wrap items-center gap-3 px-4 py-4 text-left transition-colors hover:bg-stone-50 sm:flex-nowrap sm:gap-4 sm:px-6"
                 >
                   {/* Logo/Avatar */}
                   {company.logo_url ? (

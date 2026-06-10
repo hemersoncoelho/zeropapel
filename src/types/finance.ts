@@ -1,15 +1,18 @@
 export type TransactionDirection = 'payable' | 'receivable'
 export type TransactionStatus = 'open' | 'partial' | 'paid' | 'overdue' | 'canceled'
 
+export type BankAccountType = 'checking' | 'savings' | 'cash' | 'credit' | 'investment'
+
 export interface BankAccount {
   id: string
   company_id: string
   name: string
-  type: string
+  type: BankAccountType
   initial_balance: number
   current_balance: number
   is_active: boolean
   created_at: string
+  updated_at: string
 }
 
 export interface Category {
@@ -30,6 +33,19 @@ export interface Contact {
   phone: string | null
   is_active: boolean
   created_at: string
+  updated_at: string
+}
+
+export interface Transfer {
+  id: string
+  company_id: string
+  from_bank_account_id: string
+  to_bank_account_id: string
+  amount: number
+  transfer_date: string
+  description: string | null
+  created_at: string
+  updated_at: string
 }
 
 export type OperationalGroup = 'Recebíveis' | 'Despesas fixas' | 'Despesas variáveis' | 'Pessoal' | 'Impostos' | 'Outros' | 'Todos'

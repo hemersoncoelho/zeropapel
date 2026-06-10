@@ -1,13 +1,17 @@
 import { useState, useMemo, useEffect } from 'react'
 import {
   ArrowDownRight, ArrowUpRight, Plus, Filter, MoreVertical,
-  CheckCircle2, Clock, AlertCircle, PiggyBank, Save, X, Info, Expand
+  CheckCircle2, Clock, AlertCircle, PiggyBank, Save, X, Info, Expand,
+  Trash2, ChevronLeft, ChevronRight, Search,
 } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import { formatCurrency } from '../lib/utils'
 import { useAuth } from '../contexts/AuthContext'
+import { usePermission } from '../hooks/usePermission'
 import { supabase } from '../lib/supabase'
 import type { Title, TransactionDirection, TransactionStatus, OperationalGroup } from '../types/finance'
+
+const PAGE_SIZE = 30
 
 const STATUS_STYLES: Record<TransactionStatus, { label: string; dot: string; bg: string; text: string; icon: any }> = {
   open: { label: 'Em aberto', dot: 'bg-amber-400', bg: 'bg-amber-50', text: 'text-amber-700', icon: Clock },
@@ -47,12 +51,15 @@ function TransactionDetailsModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-stone-900/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white border border-stone-200 rounded-2xl w-full max-w-2xl shadow-2xl animate-slide-up flex flex-col max-h-[90vh]">
-        
+    <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4">
+      <div className="absolute inset-0 bg-stone-900/40 backdrop-blur-sm" onClick={onClose} aria-hidden />
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="relative flex max-h-[min(92dvh,100%)] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl border border-stone-200 bg-white shadow-2xl animate-slide-up sm:max-h-[90vh] sm:rounded-2xl"
+      >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-stone-100">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-stone-100 px-4 py-4 sm:px-6 sm:py-5">
           <div className="flex items-center gap-2">
             <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${form.direction === 'receivable' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
                {form.direction === 'receivable' ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}
@@ -61,16 +68,16 @@ function TransactionDetailsModal({
               {isDraft ? 'Novo Lançamento (Rascunho)' : 'Detalhes do Lançamento'}
             </h2>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors">
-            <X size={16} />
+          <button type="button" onClick={onClose} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700">
+            <X size={18} />
           </button>
         </div>
 
         {/* Content */}
-        <div className="overflow-y-auto p-6">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6">
           <form id="tx-form" onSubmit={handleSubmit} className="space-y-6">
             
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="block text-xs font-semibold text-stone-500 mb-1.5">Descrição</label>
                 <input type="text" autoFocus value={form.description || ''} onChange={e => setForm({...form, description: e.target.value})} className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm text-stone-800 focus:outline-none focus:border-stone-400" />
@@ -81,7 +88,7 @@ function TransactionDetailsModal({
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                <div>
                 <label className="block text-xs font-semibold text-stone-500 mb-1.5">Data de {form.direction === 'receivable' ? 'Recebimento/Vencimento' : 'Vencimento/Pagamento'}</label>
                 <input type="date" value={form.due_date || ''} onChange={e => setForm({...form, due_date: e.target.value})} className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm text-stone-800 focus:outline-none focus:border-stone-400" />
@@ -104,14 +111,14 @@ function TransactionDetailsModal({
             </div>
 
             <div className="p-4 bg-stone-50 border border-stone-200 rounded-xl space-y-4">
-              <h3 className="text-sm font-medium text-stone-800 flex items-center justify-between">
+              <h3 className="flex flex-col gap-2 text-sm font-medium text-stone-800 sm:flex-row sm:items-center sm:justify-between">
                 <span className="flex items-center gap-2"><Info size={16} className="text-stone-400" /> Detalhes Estratégicos</span>
                 
                 {/* Permite alterar situação dentro do modal também! */}
                 <select 
                   value={form.status || 'open'}
                   onChange={e => setForm({...form, status: e.target.value as TransactionStatus})}
-                  className="bg-white border border-stone-200 text-xs px-2 py-1 rounded text-stone-700 outline-none"
+                  className="min-h-[44px] w-full rounded border border-stone-200 bg-white px-2 py-2 text-xs text-stone-700 outline-none sm:min-h-0 sm:w-auto sm:py-1"
                 >
                   <option value="open">Em aberto</option>
                   <option value="paid">{form.direction === 'receivable' ? 'Recebido' : 'Pago'}</option>
@@ -121,7 +128,7 @@ function TransactionDetailsModal({
                 </select>
               </h3>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="flex items-center gap-3">
                   <input type="checkbox" id="recorrente" checked={form.is_recurring} onChange={e => setForm({...form, is_recurring: e.target.checked})} className="w-4 h-4 rounded border-stone-300 text-stone-900 focus:ring-stone-900" />
                   <div>
@@ -145,11 +152,11 @@ function TransactionDetailsModal({
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-stone-100 flex justify-between items-center bg-stone-50 rounded-b-2xl">
-          <span className="text-xs text-stone-400">{isDraft ? 'Salvando criará o item.' : 'Atualização imediata.'}</span>
-          <div className="flex gap-3">
-            <Button variant="secondary" onClick={onClose}>Cancelar</Button>
-            <Button variant="primary" type="submit" form="tx-form" disabled={saving}>
+        <div className="flex shrink-0 flex-col gap-3 border-t border-stone-100 bg-stone-50 p-4 sm:flex-row sm:items-center sm:justify-between sm:rounded-b-2xl sm:p-6">
+          <span className="order-2 text-center text-xs text-stone-400 sm:order-1 sm:text-left">{isDraft ? 'Salvando criará o item.' : 'Atualização imediata.'}</span>
+          <div className="order-1 flex w-full flex-col gap-2 sm:order-2 sm:w-auto sm:flex-row">
+            <Button variant="secondary" className="w-full sm:w-auto" onClick={onClose}>Cancelar</Button>
+            <Button variant="primary" type="submit" form="tx-form" className="w-full sm:w-auto" disabled={saving}>
                {saving ? 'Salvando...' : (isDraft ? 'Salvar Lançamento' : 'Salvar Alterações')}
             </Button>
           </div>
@@ -302,13 +309,48 @@ export function TransactionsPage() {
       .from('transactions')
       .update({ status: newStatus })
       .eq('id', id)
-
-    if (error) {
-      alert('Erro ao alterar status: ' + error.message)
-      return
-    }
+    if (error) { alert('Erro ao alterar status: ' + error.message); return }
     setData(prev => prev.map(t => t.id === id ? { ...t, status: newStatus } : t))
   }
+
+  const handleDelete = async (id: string, description: string) => {
+    if (!window.confirm(`Excluir "${description}"? Esta ação não pode ser desfeita.`)) return
+    const { error } = await supabase.from('transactions').delete().eq('id', id)
+    if (error) { alert('Erro ao excluir: ' + error.message); return }
+    setData(prev => prev.filter(t => t.id !== id))
+  }
+
+  // ── Filter state ──────────────────────────────────────────
+  const [showFilters,  setShowFilters]  = useState(false)
+  const [filterStatus, setFilterStatus] = useState<TransactionStatus | ''>('')
+  const [filterDir,    setFilterDir]    = useState<TransactionDirection | ''>('')
+  const [filterSearch, setFilterSearch] = useState('')
+  const [filterFrom,   setFilterFrom]   = useState('')
+  const [filterTo,     setFilterTo]     = useState('')
+  const [page, setPage] = useState(1)
+
+  const { can } = usePermission()
+
+  const filteredAndSearched = useMemo(() => {
+    let rows = filteredData
+    if (filterStatus) rows = rows.filter(t => t.status === filterStatus)
+    if (filterDir)    rows = rows.filter(t => t.direction === filterDir)
+    if (filterFrom)   rows = rows.filter(t => t.due_date >= filterFrom)
+    if (filterTo)     rows = rows.filter(t => t.due_date <= filterTo)
+    if (filterSearch) {
+      const q = filterSearch.toLowerCase()
+      rows = rows.filter(t => t.description.toLowerCase().includes(q))
+    }
+    return rows
+  }, [filteredData, filterStatus, filterDir, filterFrom, filterTo, filterSearch])
+
+  const totalPages = Math.max(1, Math.ceil(filteredAndSearched.length / PAGE_SIZE))
+  const pagedData  = filteredAndSearched.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  // reset page when filters change
+  useEffect(() => setPage(1), [activeTab, filterStatus, filterDir, filterFrom, filterTo, filterSearch])
+
+  const hasFilters = !!(filterStatus || filterDir || filterFrom || filterTo || filterSearch)
 
   const summary = useMemo(() => {
     let payable = 0, receivable = 0, overdue = 0
@@ -328,35 +370,82 @@ export function TransactionsPage() {
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 animate-fade-in pb-20">
       
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-display font-bold text-stone-900 tracking-tight">Lançamentos</h1>
-          <p className="text-sm text-stone-500 mt-1">Gerencie suas movimentações financeiras de forma categorizada.</p>
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl font-display font-bold tracking-tight text-stone-900 sm:text-2xl">Lançamentos</h1>
+          <p className="mt-1 text-sm text-stone-500">Gerencie suas movimentações financeiras de forma categorizada.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="secondary" icon={<Filter size={15}/>}>Filtros Avançados</Button>
-          <Button variant="primary" icon={<Plus size={15}/>} onClick={() => { setIsCreating(true); setSelectedTx(null); }}>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          <Button
+            variant={showFilters || hasFilters ? 'primary' : 'secondary'}
+            className="w-full sm:w-auto"
+            icon={<Filter size={15}/>}
+            onClick={() => setShowFilters(p => !p)}
+          >
+            {hasFilters ? 'Filtros ativos' : 'Filtros'}
+          </Button>
+          <Button variant="primary" className="w-full sm:w-auto" icon={<Plus size={15}/>} onClick={() => { setIsCreating(true); setSelectedTx(null); }}>
             Novo Lançamento
           </Button>
         </div>
       </div>
 
       {/* OPERATIONAL TABS */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide border-b border-stone-200">
+      <div className="-mx-1 flex touch-pan-x items-center gap-2 overflow-x-auto border-b border-stone-200 px-1 pb-2 scrollbar-hide">
         {TABS.map(tab => (
           <button
             key={tab}
+            type="button"
             onClick={() => { setActiveTab(tab); setIsCreating(false); }}
-            className={`whitespace-nowrap px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-[1px] ${
+            className={`flex min-h-[44px] shrink-0 items-center whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors -mb-[1px] sm:min-h-0 sm:px-4 ${
               activeTab === tab 
                 ? 'border-stone-900 text-stone-900' 
-                : 'border-transparent text-stone-500 hover:text-stone-700 hover:border-stone-300'
+                : 'border-transparent text-stone-500 hover:border-stone-300 hover:text-stone-700'
             }`}
           >
             {tab}
           </button>
         ))}
       </div>
+
+      {/* FILTER PANEL */}
+      {showFilters && (
+        <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 space-y-3 animate-fade-in">
+          <div className="flex flex-wrap gap-3">
+            <div className="relative flex-1 min-w-[160px]">
+              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none" />
+              <input type="text" placeholder="Buscar descrição..." value={filterSearch} onChange={e => setFilterSearch(e.target.value)}
+                className="w-full pl-8 pr-3 h-9 rounded-lg border border-stone-200 bg-white text-sm text-stone-800 placeholder:text-stone-400 focus:outline-none focus:border-stone-400" />
+            </div>
+            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value as TransactionStatus | '')}
+              className="h-9 rounded-lg border border-stone-200 bg-white px-3 text-sm text-stone-700 focus:outline-none focus:border-stone-400">
+              <option value="">Todos os status</option>
+              <option value="open">Em aberto</option>
+              <option value="paid">Pago</option>
+              <option value="partial">Parcial</option>
+              <option value="overdue">Vencido</option>
+              <option value="canceled">Cancelado</option>
+            </select>
+            <select value={filterDir} onChange={e => setFilterDir(e.target.value as TransactionDirection | '')}
+              className="h-9 rounded-lg border border-stone-200 bg-white px-3 text-sm text-stone-700 focus:outline-none focus:border-stone-400">
+              <option value="">Entrada e saída</option>
+              <option value="receivable">Só receitas</option>
+              <option value="payable">Só despesas</option>
+            </select>
+            <input type="date" value={filterFrom} onChange={e => setFilterFrom(e.target.value)}
+              className="h-9 rounded-lg border border-stone-200 bg-white px-3 text-sm text-stone-700 focus:outline-none focus:border-stone-400" />
+            <input type="date" value={filterTo} onChange={e => setFilterTo(e.target.value)}
+              className="h-9 rounded-lg border border-stone-200 bg-white px-3 text-sm text-stone-700 focus:outline-none focus:border-stone-400" />
+            {hasFilters && (
+              <button type="button" onClick={() => { setFilterStatus(''); setFilterDir(''); setFilterSearch(''); setFilterFrom(''); setFilterTo('') }}
+                className="flex items-center gap-1 h-9 px-3 rounded-lg border border-red-200 bg-red-50 text-xs font-medium text-red-600 hover:bg-red-100 transition-colors">
+                <X size={12} /> Limpar
+              </button>
+            )}
+          </div>
+          <p className="text-xs text-stone-400">{filteredAndSearched.length} lançamento(s) encontrado(s)</p>
+        </div>
+      )}
 
       {/* SUMMARY */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -385,8 +474,8 @@ export function TransactionsPage() {
         {loading ? (
           <div className="p-12 pl-4 text-center text-stone-400">Carregando dados operacionais...</div>
         ) : (
-          <div className="overflow-x-auto overflow-visible">
-            <table className="w-full text-left text-sm whitespace-nowrap">
+          <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+            <table className="min-w-[720px] w-full text-left text-sm">
               <thead>
                 <tr className="bg-stone-50/50 border-b border-stone-200 text-stone-500 font-medium h-10">
                   <th className="px-4 py-2 font-medium w-10 text-center">Tipo</th>
@@ -475,11 +564,11 @@ export function TransactionsPage() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => setIsCreating(false)} className="p-1 text-stone-400 hover:text-stone-600 rounded">
-                          <X size={16} />
+                        <button type="button" onClick={() => setIsCreating(false)} className="flex h-10 w-10 items-center justify-center rounded-lg text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600">
+                          <X size={18} />
                         </button>
-                        <button onClick={() => handleSaveDraftToDB(draftTx)} className="p-1 text-emerald-600 hover:text-emerald-700 bg-emerald-50 rounded" disabled={savingInline}>
-                          <Save size={16} />
+                        <button type="button" onClick={() => handleSaveDraftToDB(draftTx)} className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 transition-colors hover:bg-emerald-100 hover:text-emerald-700 disabled:opacity-50" disabled={savingInline}>
+                          <Save size={18} />
                         </button>
                       </div>
                     </td>
@@ -487,7 +576,7 @@ export function TransactionsPage() {
                 )}
   
                 {/* DATA ROWS */}
-                {filteredData.map((row) => {
+                 {pagedData.map((row) => {
                   const s = STATUS_STYLES[row.status]
                   const isReceivable = row.direction === 'receivable'
                   return (
@@ -510,9 +599,9 @@ export function TransactionsPage() {
                         title="Clique p/ editar detalhes ricos"
                         onClick={() => setSelectedTx(row)}
                       >
-                         <div className="flex items-center justify-between w-full">
-                           <span className="truncate max-w-[200px]">{row.description}</span>
-                           <Expand size={14} className="text-stone-400 opacity-0 group-hover/desc:opacity-100 transition-opacity" />
+                         <div className="flex w-full min-w-0 items-center justify-between gap-2">
+                           <span className="min-w-0 truncate sm:max-w-[220px]">{row.description}</span>
+                           <Expand size={14} className="shrink-0 text-stone-400 opacity-60 transition-opacity group-hover/desc:opacity-100 sm:opacity-0 sm:group-hover/desc:opacity-100" />
                          </div>
                       </td>
                       <td className="px-4 py-3 text-stone-500 hidden md:table-cell truncate max-w-[150px]">
@@ -531,7 +620,7 @@ export function TransactionsPage() {
                               title="Alterar Situação"
                               value={row.status}
                               onChange={e => handleUpdateStatus(row.id, e.target.value as TransactionStatus)}
-                              className={`appearance-none cursor-pointer inline-flex items-center gap-1.5 pl-6 pr-4 py-0.5 rounded-md text-xs font-medium focus:outline-none focus:ring-2 focus:ring-stone-400 transition-colors ${s.bg} ${s.text}`}
+                              className={`inline-flex min-h-[40px] cursor-pointer appearance-none items-center gap-1.5 rounded-md py-1.5 pl-6 pr-4 text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-stone-400 sm:min-h-0 sm:py-0.5 ${s.bg} ${s.text}`}
                             >
                               <option value="open">Em aberto</option>
                               <option value="paid">{isReceivable ? 'Recebido' : 'Pago'}</option>
@@ -543,30 +632,63 @@ export function TransactionsPage() {
                            </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-right">
-                        <button onClick={() => setSelectedTx(row)} className="text-stone-400 hover:text-stone-700 opacity-0 group-hover:opacity-100 transition-opacity p-1">
-                          <MoreVertical size={16} />
-                        </button>
-                      </td>
+                       <td className="px-4 py-3 text-right">
+                         <div className="flex items-center justify-end gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                           <button type="button" onClick={() => setSelectedTx(row)} className="flex h-10 w-10 items-center justify-center rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-700 sm:h-8 sm:w-8">
+                             <MoreVertical size={16} />
+                           </button>
+                           {can('delete:transactions') && (
+                             <button type="button" onClick={() => handleDelete(row.id, row.description)} className="flex h-10 w-10 items-center justify-center rounded-lg text-stone-400 hover:bg-red-50 hover:text-red-500 sm:h-8 sm:w-8">
+                               <Trash2 size={15} />
+                             </button>
+                           )}
+                         </div>
+                       </td>
                     </tr>
                   )
                 })}
-                
-                {filteredData.length === 0 && !isCreating && !loading && (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-12 text-center text-stone-500">
-                      <p>Nenhum lançamento operacional neste grupo.</p>
-                      <Button variant="primary" className="mt-4" onClick={() => setIsCreating(true)}>
-                        Criar Lançamento
-                      </Button>
-                    </td>
-                  </tr>
-                )}
+                                {filteredAndSearched.length === 0 && !isCreating && !loading && (
+                   <tr>
+                     <td colSpan={7} className="px-4 py-12 text-center text-stone-500">
+                       <p>{hasFilters ? 'Nenhum lançamento com esses filtros.' : 'Nenhum lançamento neste grupo.'}</p>
+                       {!hasFilters && <Button variant="primary" className="mt-4" onClick={() => setIsCreating(true)}>Criar Lançamento</Button>}
+                     </td>
+                   </tr>
+                 )}
               </tbody>
             </table>
           </div>
         )}
       </div>
+
+      {/* PAGINATION */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between rounded-xl border border-stone-200 bg-white px-4 py-3 shadow-sm">
+          <span className="text-xs text-stone-400">
+            Página {page} de {totalPages} · {filteredAndSearched.length} lançamentos
+          </span>
+          <div className="flex items-center gap-1">
+            <button type="button" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-stone-200 text-stone-500 disabled:opacity-40 hover:bg-stone-50 transition-colors">
+              <ChevronLeft size={15} />
+            </button>
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              const start = Math.max(1, Math.min(page - 2, totalPages - 4))
+              const n = start + i
+              return (
+                <button key={n} type="button" onClick={() => setPage(n)}
+                  className={`flex h-8 w-8 items-center justify-center rounded-lg text-xs font-medium transition-colors ${
+                    n === page ? 'bg-stone-900 text-white' : 'border border-stone-200 text-stone-500 hover:bg-stone-50'
+                  }`}>{n}</button>
+              )
+            })}
+            <button type="button" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-stone-200 text-stone-500 disabled:opacity-40 hover:bg-stone-50 transition-colors">
+              <ChevronRight size={15} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* MODAL DE DETALHES CLICÁVEIS */}
       {selectedTx && (

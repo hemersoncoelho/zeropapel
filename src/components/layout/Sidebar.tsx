@@ -5,7 +5,6 @@ import {
   Wallet,
   Users,
   Repeat2,
-  BarChart3,
   Tag,
   Settings,
   LogOut,
@@ -20,12 +19,11 @@ import { useAdmin } from '../../contexts/AdminContext'
 import { getInitials } from '../../lib/utils'
 
 const NAV_MAIN = [
-  { to: '/dashboard',    label: 'Dashboard',      icon: LayoutDashboard },
-  { to: '/lancamentos',  label: 'Lançamentos',    icon: ArrowLeftRight },
+  { to: '/dashboard',    label: 'Visão Geral',     icon: LayoutDashboard },
+  { to: '/lancamentos',  label: 'Lançamentos',     icon: ArrowLeftRight },
   { to: '/accounts',     label: 'Contas Bancárias', icon: Wallet },
-  { to: '/contacts',     label: 'Contatos',       icon: Users },
+  { to: '/contacts',     label: 'Contatos',        icon: Users },
   { to: '/transfers',    label: 'Transferências',  icon: Repeat2 },
-  { to: '/reports',      label: 'Relatórios',     icon: BarChart3 },
 ]
 
 const NAV_ADMIN = [
@@ -34,7 +32,12 @@ const NAV_ADMIN = [
   { to: '/settings',     label: 'Configurações',  icon: Settings, minRole: 'admin' as const },
 ]
 
-export function Sidebar() {
+type SidebarProps = {
+  mobileOpen?: boolean
+  onMobileClose?: () => void
+}
+
+export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
   const { profile, activeCompany, companies, signOut } = useAuth()
   const { hasRole } = usePermission()
   const { isAdmin } = useAdmin()
@@ -42,13 +45,20 @@ export function Sidebar() {
 
   const handleSignOut = async () => {
     await signOut()
+    onMobileClose?.()
     navigate('/login')
   }
 
   const adminNavItems = NAV_ADMIN.filter(item => hasRole(item.minRole))
 
   return (
-    <aside className="w-[240px] min-w-[240px] h-screen bg-white border-r border-stone-200 flex flex-col sticky top-0 overflow-hidden">
+    <aside
+      className={`
+        fixed inset-y-0 left-0 z-50 flex h-[100dvh] w-[min(288px,92vw)] flex-col overflow-hidden border-r border-stone-200 bg-white shadow-xl transition-transform duration-200 ease-out
+        lg:static lg:z-auto lg:h-screen lg:w-[240px] lg:min-w-[240px] lg:translate-x-0 lg:shadow-none
+        ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+      `}
+    >
 
       {/* ── Logo ── */}
       <div className="px-4 py-4 border-b border-stone-100 flex items-center gap-2.5">
@@ -67,8 +77,9 @@ export function Sidebar() {
         <div className="px-3 pt-3 pb-2">
           {companies.length > 1 ? (
             <button
-              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg bg-stone-50 border border-stone-200 hover:border-stone-300 hover:bg-stone-100 transition-all group"
-              onClick={() => navigate('/select-company')}
+              type="button"
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 min-h-[44px] rounded-lg bg-stone-50 border border-stone-200 hover:border-stone-300 hover:bg-stone-100 transition-all group lg:min-h-0 lg:py-2"
+              onClick={() => { navigate('/select-company'); onMobileClose?.() }}
             >
               <div className="w-7 h-7 rounded-md bg-rose-100 flex items-center justify-center shrink-0">
                 <Building2 size={14} className="text-rose-600" />
@@ -98,6 +109,7 @@ export function Sidebar() {
             <NavLink
               key={to}
               to={to}
+              onClick={() => onMobileClose?.()}
               className={({ isActive }) =>
                 `nav-item ${isActive ? 'active' : ''}`
               }
@@ -120,6 +132,7 @@ export function Sidebar() {
                 <NavLink
                   key={to}
                   to={to}
+                  onClick={() => onMobileClose?.()}
                   className={({ isActive }) =>
                     `nav-item ${isActive ? 'active' : ''}`
                   }
@@ -142,6 +155,7 @@ export function Sidebar() {
             </div>
             <NavLink
               to="/admin"
+              onClick={() => onMobileClose?.()}
               className={({ isActive }) =>
                 `nav-item ${isActive ? 'active' : ''}`
               }
@@ -169,11 +183,12 @@ export function Sidebar() {
           </div>
 
           <button
+            type="button"
             onClick={handleSignOut}
-            className="p-1.5 rounded-md text-stone-400 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-stone-400 transition-colors hover:bg-red-50 hover:text-red-500 lg:h-9 lg:w-9 lg:opacity-0 lg:group-hover:opacity-100"
             title="Sair"
           >
-            <LogOut size={14} />
+            <LogOut size={16} />
           </button>
         </div>
       </div>
