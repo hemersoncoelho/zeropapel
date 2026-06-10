@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import {
   ArrowDownRight, ArrowUpRight, Plus, Filter, MoreVertical,
   CheckCircle2, Clock, AlertCircle, PiggyBank, Save, X, Info, Expand,
-  Trash2, ChevronLeft, ChevronRight, Search,
+  Trash2, ChevronLeft, ChevronRight, Search, Upload,
 } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import { formatCurrency } from '../lib/utils'
@@ -10,6 +10,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { usePermission } from '../hooks/usePermission'
 import { supabase } from '../lib/supabase'
 import type { Title, TransactionDirection, TransactionStatus, OperationalGroup } from '../types/finance'
+import { ImportExtratoModal } from '../components/transactions/ImportExtratoModal'
 
 const PAGE_SIZE = 30
 
@@ -179,7 +180,8 @@ export function TransactionsPage() {
   const [savingInline, setSavingInline] = useState(false)
   
   const [activeTab, setActiveTab] = useState<OperationalGroup>('Todos')
-  
+  const [showImport, setShowImport] = useState(false)
+
   // Selected Tx for Modal (can be a real one OR the draft one)
   const [selectedTx, setSelectedTx] = useState<Partial<Title> | null>(null)
 
@@ -383,6 +385,9 @@ export function TransactionsPage() {
             onClick={() => setShowFilters(p => !p)}
           >
             {hasFilters ? 'Filtros ativos' : 'Filtros'}
+          </Button>
+          <Button variant="secondary" className="w-full sm:w-auto" icon={<Upload size={15}/>} onClick={() => setShowImport(true)}>
+            Importar Extrato
           </Button>
           <Button variant="primary" className="w-full sm:w-auto" icon={<Plus size={15}/>} onClick={() => { setIsCreating(true); setSelectedTx(null); }}>
             Novo Lançamento
@@ -692,10 +697,19 @@ export function TransactionsPage() {
 
       {/* MODAL DE DETALHES CLICÁVEIS */}
       {selectedTx && (
-        <TransactionDetailsModal 
-          transaction={selectedTx} 
-          onClose={() => setSelectedTx(null)} 
+        <TransactionDetailsModal
+          transaction={selectedTx}
+          onClose={() => setSelectedTx(null)}
           onSave={handleModalSave}
+        />
+      )}
+
+      {/* MODAL DE IMPORTAÇÃO DE EXTRATO */}
+      {showImport && activeCompany && (
+        <ImportExtratoModal
+          companyId={activeCompany.id}
+          onClose={() => setShowImport(false)}
+          onImported={() => { setShowImport(false); fetchTransactions() }}
         />
       )}
 
