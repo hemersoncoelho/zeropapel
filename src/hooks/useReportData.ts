@@ -4,18 +4,20 @@ import type {
   ReportOverview,
   TimeseriesPoint,
   GroupBreakdownRow,
+  CategoryBreakdownRow,
   RecentTx,
   TimeseriesGroupBy,
 } from '../types/reports'
 
 export interface ReportData {
-  overview:   ReportOverview | null
-  timeseries: TimeseriesPoint[]
-  breakdown:  GroupBreakdownRow[]
-  recentTx:   RecentTx[]
-  loading:    boolean
-  error:      string | null
-  refetch:    () => Promise<void>
+  overview:          ReportOverview | null
+  timeseries:        TimeseriesPoint[]
+  breakdown:         GroupBreakdownRow[]
+  categoryBreakdown: CategoryBreakdownRow[]
+  recentTx:          RecentTx[]
+  loading:           boolean
+  error:             string | null
+  refetch:           () => Promise<void>
 }
 
 const toNum = (v: unknown): number => {
@@ -30,12 +32,13 @@ export function useReportData(
   dateTo:    string,
   groupBy:   TimeseriesGroupBy,
 ): ReportData {
-  const [overview,   setOverview]   = useState<ReportOverview | null>(null)
-  const [timeseries, setTimeseries] = useState<TimeseriesPoint[]>([])
-  const [breakdown,  setBreakdown]  = useState<GroupBreakdownRow[]>([])
-  const [recentTx,   setRecentTx]   = useState<RecentTx[]>([])
-  const [loading,    setLoading]    = useState(false)
-  const [error,      setError]      = useState<string | null>(null)
+  const [overview,          setOverview]          = useState<ReportOverview | null>(null)
+  const [timeseries,        setTimeseries]        = useState<TimeseriesPoint[]>([])
+  const [breakdown,         setBreakdown]         = useState<GroupBreakdownRow[]>([])
+  const [categoryBreakdown, setCategoryBreakdown] = useState<CategoryBreakdownRow[]>([])
+  const [recentTx,          setRecentTx]          = useState<RecentTx[]>([])
+  const [loading,           setLoading]           = useState(false)
+  const [error,             setError]             = useState<string | null>(null)
 
   const fetchAll = useCallback(async () => {
     if (!companyId || !dateFrom || !dateTo) return
@@ -44,7 +47,7 @@ export function useReportData(
     setError(null)
 
     try {
-    const [ovRes, tsRes, grRes, rxRes] = await Promise.all([
+    const [ovRes, tsRes, grRes, catRes, rxRes] = await Promise.all([
       supabase.rpc('get_report_overview', {
         p_company_id: companyId,
         p_date_from:  dateFrom,
@@ -61,6 +64,11 @@ export function useReportData(
         p_date_from:  dateFrom,
         p_date_to:    dateTo,
       }),
+      supabase.rpc('get_report_by_category', {
+        p_company_id: companyId,
+        p_date_from:  dateFrom,
+        p_date_to:    dateTo,
+      }),
       supabase.rpc('get_report_recent_transactions', {
         p_company_id: companyId,
         p_date_from:  dateFrom,
@@ -69,7 +77,7 @@ export function useReportData(
       }),
     ])
 
-    const firstError = [ovRes.error, tsRes.error, grRes.error, rxRes.error].find(Boolean)
+    const firstError = [ovRes.error, tsRes.error, grRes.error, catRes.error, rxRes.error].find(Boolean)
     if (firstError) {
       setError(`Erro ao carregar relatório: ${firstError.message}`)
       setLoading(false)
@@ -115,6 +123,18 @@ export function useReportData(
       }))
     )
 
+    setCategoryBreakdown(
+      ((catRes.data ?? []) as Record<string, unknown>[]).map(r => ({
+        category_id:    r.category_id ? String(r.category_id) : null,
+        category_name:  String(r.category_name  ?? 'Sem categoria'),
+        category_color: String(r.category_color ?? '#6b7280'),
+        direction:      String(r.direction       ?? ''),
+        total_amount:   toNum(r.total_amount),
+        tx_count:       toNum(r.tx_count),
+        percentage:     toNum(r.percentage),
+      }))
+    )
+
     setRecentTx(
       ((rxRes.data ?? []) as Record<string, unknown>[]).map(r => ({
         id:                String(r.id          ?? ''),
@@ -138,5 +158,5 @@ export function useReportData(
     fetchAll()
   }, [fetchAll])
 
-  return { overview, timeseries, breakdown, recentTx, loading, error, refetch: fetchAll }
+  return { overview, timeseries, breakdown, categoryBreakdown, recentTx, loading, error, refetch: fetchAll }
 }

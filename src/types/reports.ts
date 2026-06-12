@@ -38,6 +38,16 @@ export interface RecentTx {
   operational_group: string
 }
 
+export interface CategoryBreakdownRow {
+  category_id:    string | null
+  category_name:  string
+  category_color: string
+  direction:      string
+  total_amount:   number
+  tx_count:       number
+  percentage:     number
+}
+
 export type TimeseriesGroupBy = 'day' | 'week' | 'month'
 
 export type ReportDateRange = {

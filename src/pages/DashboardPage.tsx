@@ -11,11 +11,11 @@ import { formatCurrency } from '../lib/utils'
 import { useAuth } from '../contexts/AuthContext'
 import { usePermission } from '../hooks/usePermission'
 import { useReportData } from '../hooks/useReportData'
-import type { ReportOverview, GroupBreakdownRow, RecentTx, TimeseriesGroupBy } from '../types/reports'
+import type { ReportOverview, GroupBreakdownRow, CategoryBreakdownRow, RecentTx, TimeseriesGroupBy } from '../types/reports'
 
 // ── Period config ───────────────────────────────────────────────
 type PeriodKey = '7d' | 'month' | '3m' | 'year'
-type ViewType  = 'resumo' | 'dre' | 'grupos'
+type ViewType  = 'resumo' | 'dre' | 'grupos' | 'categorias'
 
 const PERIODS: { key: PeriodKey; label: string }[] = [
   { key: '7d',    label: '7 dias'   },
@@ -25,9 +25,10 @@ const PERIODS: { key: PeriodKey; label: string }[] = [
 ]
 
 const VIEWS: { key: ViewType; label: string; icon: React.ReactNode }[] = [
-  { key: 'resumo', label: 'Resumo',   icon: <LayoutGrid size={14} /> },
-  { key: 'dre',    label: 'DRE',      icon: <FileText   size={14} /> },
-  { key: 'grupos', label: 'Por Grupo',icon: <BarChart3  size={14} /> },
+  { key: 'resumo',     label: 'Resumo',      icon: <LayoutGrid size={14} /> },
+  { key: 'dre',        label: 'DRE',         icon: <FileText   size={14} /> },
+  { key: 'grupos',     label: 'Por Grupo',   icon: <BarChart3  size={14} /> },
+  { key: 'categorias', label: 'Categorias',  icon: <BarChart3  size={14} /> },
 ]
 
 function computeDateRange(key: PeriodKey): { from: string; to: string } {
@@ -412,6 +413,97 @@ function GruposView({ overview, breakdown, loading }: { overview: ReportOverview
   )
 }
 
+// ── Categorias view ─────────────────────────────────────────────
+function CategoryRow({ row, maxAmount }: { row: CategoryBreakdownRow; maxAmount: number }) {
+  return (
+    <div>
+      <div className="flex items-center justify-between text-xs mb-1.5 gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: row.category_color }} />
+          <span className="font-medium text-stone-700 truncate">{row.category_name}</span>
+        </div>
+        <div className="flex items-center gap-2 shrink-0 text-stone-500 font-mono tabular-nums">
+          <span>{formatCurrency(row.total_amount)}</span>
+          <span className="text-stone-300">·</span>
+          <span className="font-semibold text-stone-600">{row.percentage.toFixed(1)}%</span>
+        </div>
+      </div>
+      <div className="h-1.5 bg-stone-100 rounded-full overflow-hidden">
+        <div
+          className="h-full rounded-full transition-all duration-700"
+          style={{
+            width: `${maxAmount > 0 ? Math.min(100, Math.max(1, (row.total_amount / maxAmount) * 100)) : 0}%`,
+            backgroundColor: row.category_color,
+          }}
+        />
+      </div>
+    </div>
+  )
+}
+
+function CategoriasView({
+  overview,
+  categoryBreakdown,
+  loading,
+}: {
+  overview:          ReportOverview | null
+  categoryBreakdown: CategoryBreakdownRow[]
+  loading:           boolean
+}) {
+  const expenses = categoryBreakdown.filter(r => r.direction === 'payable')
+  const revenues = categoryBreakdown.filter(r => r.direction === 'receivable')
+  const maxExp   = expenses.reduce((m, r) => Math.max(m, r.total_amount), 0)
+  const maxRev   = revenues.reduce((m, r) => Math.max(m, r.total_amount), 0)
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* Despesas por categoria */}
+      <div className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden">
+        <div className="flex flex-col gap-1 border-b border-stone-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-4">
+          <h3 className="text-sm font-semibold text-stone-800">Despesas por Categoria</h3>
+          <span className="font-mono text-sm font-bold tabular-nums text-stone-900">{formatCurrency(overview?.expense_total ?? 0)}</span>
+        </div>
+        <div className="space-y-4 p-4 sm:p-5">
+          {loading ? (
+            Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="animate-pulse space-y-1.5">
+                <div className="flex justify-between"><div className="h-2.5 w-32 bg-stone-100 rounded" /><div className="h-2.5 w-16 bg-stone-100 rounded" /></div>
+                <div className="h-2 bg-stone-100 rounded-full" />
+              </div>
+            ))
+          ) : expenses.length === 0 ? (
+            <p className="text-sm text-stone-400 py-4 text-center">Nenhuma despesa categorizada no período.</p>
+          ) : (
+            expenses.map(row => <CategoryRow key={`${row.category_id ?? 'none'}-exp`} row={row} maxAmount={maxExp} />)
+          )}
+        </div>
+      </div>
+
+      {/* Receitas por categoria */}
+      <div className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden">
+        <div className="flex flex-col gap-1 border-b border-stone-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-4">
+          <h3 className="text-sm font-semibold text-stone-800">Receitas por Categoria</h3>
+          <span className="font-mono text-sm font-bold tabular-nums text-stone-900">{formatCurrency(overview?.revenue_total ?? 0)}</span>
+        </div>
+        <div className="space-y-4 p-4 sm:p-5">
+          {loading ? (
+            Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="animate-pulse space-y-1.5">
+                <div className="flex justify-between"><div className="h-2.5 w-32 bg-stone-100 rounded" /><div className="h-2.5 w-16 bg-stone-100 rounded" /></div>
+                <div className="h-2 bg-stone-100 rounded-full" />
+              </div>
+            ))
+          ) : revenues.length === 0 ? (
+            <p className="text-sm text-stone-400 py-4 text-center">Nenhuma receita categorizada no período.</p>
+          ) : (
+            revenues.map(row => <CategoryRow key={`${row.category_id ?? 'none'}-rec`} row={row} maxAmount={maxRev} />)
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Main page ───────────────────────────────────────────────────
 export function DashboardPage() {
   const { activeCompany, profile } = useAuth()
@@ -424,7 +516,7 @@ export function DashboardPage() {
 
   const { from: dateFrom, to: dateTo } = useMemo(() => computeDateRange(activePeriod), [activePeriod])
 
-  const { overview, timeseries, breakdown, recentTx, loading, error, refetch } =
+  const { overview, timeseries, breakdown, categoryBreakdown, recentTx, loading, error, refetch } =
     useReportData(activeCompany?.id, dateFrom, dateTo, groupBy)
 
   const handlePeriod = (key: PeriodKey) => {
@@ -657,6 +749,10 @@ export function DashboardPage() {
 
       {activeView === 'grupos' && (
         <GruposView overview={overview} breakdown={breakdown} loading={loading} />
+      )}
+
+      {activeView === 'categorias' && (
+        <CategoriasView overview={overview} categoryBreakdown={categoryBreakdown} loading={loading} />
       )}
 
     </div>

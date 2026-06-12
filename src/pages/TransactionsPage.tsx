@@ -9,7 +9,7 @@ import { formatCurrency } from '../lib/utils'
 import { useAuth } from '../contexts/AuthContext'
 import { usePermission } from '../hooks/usePermission'
 import { supabase } from '../lib/supabase'
-import type { Title, TransactionDirection, TransactionStatus, OperationalGroup } from '../types/finance'
+import type { Title, TransactionDirection, TransactionStatus, OperationalGroup, Category } from '../types/finance'
 import { ImportExtratoModal } from '../components/transactions/ImportExtratoModal'
 
 const PAGE_SIZE = 30
@@ -32,10 +32,12 @@ const formatShortDate = (isoString: string) => {
 
 function TransactionDetailsModal({
   transaction,
+  categories,
   onClose,
   onSave
 }: {
   transaction: Partial<Title>
+  categories:  Category[]
   onClose: () => void
   onSave: (updated: Partial<Title>) => Promise<void>
 }) {
@@ -96,7 +98,7 @@ function TransactionDetailsModal({
               </div>
               <div>
                 <label className="block text-xs font-semibold text-stone-500 mb-1.5">Direção do Lançamento</label>
-                <select value={form.direction} onChange={e => setForm({...form, direction: e.target.value as TransactionDirection})} className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm text-stone-800 focus:outline-none focus:border-stone-400">
+                <select value={form.direction} onChange={e => setForm({...form, direction: e.target.value as TransactionDirection, category_id: null})} className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm text-stone-800 focus:outline-none focus:border-stone-400">
                   <option value="payable">Saída (Despesa)</option>
                   <option value="receivable">Entrada (Receita)</option>
                 </select>
@@ -109,6 +111,31 @@ function TransactionDetailsModal({
                   {!form.operational_group && <option value="" disabled hidden>Selecione...</option>}
                 </select>
               </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-stone-500 mb-1.5">Categoria</label>
+              {(() => {
+                const filteredCats = categories.filter(c => c.is_active && c.direction === form.direction)
+                const selected = filteredCats.find(c => c.id === form.category_id)
+                return (
+                  <div className="flex items-center gap-2">
+                    {selected && (
+                      <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: selected.color }} />
+                    )}
+                    <select
+                      value={form.category_id || ''}
+                      onChange={e => setForm({ ...form, category_id: e.target.value || null })}
+                      className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm text-stone-800 focus:outline-none focus:border-stone-400"
+                    >
+                      <option value="">Sem categoria</option>
+                      {filteredCats.map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )
+              })()}
             </div>
 
             <div className="p-4 bg-stone-50 border border-stone-200 rounded-xl space-y-4">
@@ -173,7 +200,8 @@ export function TransactionsPage() {
   
   const [data, setData] = useState<Title[]>([])
   const [loading, setLoading] = useState(true)
-  
+  const [categories, setCategories] = useState<Category[]>([])
+
   // Controls inline creation draft
   const [isCreating, setIsCreating] = useState(false)
   const [draftTx, setDraftTx] = useState<Partial<Title> | null>(null)
@@ -193,13 +221,24 @@ export function TransactionsPage() {
       .select('*')
       .eq('company_id', activeCompany.id)
       .order('due_date', { ascending: false })
-      
+
     if (!error && txs) setData(txs as Title[])
     setLoading(false)
   }
 
+  const fetchCategories = async () => {
+    if (!activeCompany) return
+    const { data: cats } = await supabase
+      .from('categories')
+      .select('*')
+      .eq('company_id', activeCompany.id)
+      .order('name')
+    if (cats) setCategories(cats as Category[])
+  }
+
   useEffect(() => {
     fetchTransactions()
+    fetchCategories()
   }, [activeCompany])
   
   const filteredData = useMemo(() => {
@@ -253,6 +292,7 @@ export function TransactionsPage() {
         status: payload.status || 'open',
         amount: payload.amount,
         due_date: payload.due_date,
+        category_id: payload.category_id ?? null,
         operational_group: payload.operational_group,
         is_recurring: payload.is_recurring,
         installments: payload.installments,
@@ -288,6 +328,7 @@ export function TransactionsPage() {
            amount: updated.amount,
            due_date: updated.due_date,
            direction: updated.direction,
+           category_id: updated.category_id ?? null,
            operational_group: updated.operational_group,
            status: updated.status,
            is_recurring: updated.is_recurring,
@@ -599,13 +640,24 @@ export function TransactionsPage() {
                            {formatShortDate(row.due_date)}
                          </span>
                       </td>
-                      <td 
-                        className="px-4 py-3 font-medium text-stone-800 cursor-pointer hover:bg-stone-100 rounded transition-colors group/desc" 
+                      <td
+                        className="px-4 py-3 font-medium text-stone-800 cursor-pointer hover:bg-stone-100 rounded transition-colors group/desc"
                         title="Clique p/ editar detalhes ricos"
                         onClick={() => setSelectedTx(row)}
                       >
                          <div className="flex w-full min-w-0 items-center justify-between gap-2">
-                           <span className="min-w-0 truncate sm:max-w-[220px]">{row.description}</span>
+                           <div className="min-w-0">
+                             <span className="block truncate sm:max-w-[220px]">{row.description}</span>
+                             {row.category_id && (() => {
+                               const cat = categories.find(c => c.id === row.category_id)
+                               return cat ? (
+                                 <span className="inline-flex items-center gap-1 mt-0.5 text-[10px] font-medium text-white rounded-full px-1.5 py-0.5" style={{ backgroundColor: cat.color }}>
+                                   <span className="w-1 h-1 rounded-full bg-white/70" />
+                                   {cat.name}
+                                 </span>
+                               ) : null
+                             })()}
+                           </div>
                            <Expand size={14} className="shrink-0 text-stone-400 opacity-60 transition-opacity group-hover/desc:opacity-100 sm:opacity-0 sm:group-hover/desc:opacity-100" />
                          </div>
                       </td>
@@ -699,6 +751,7 @@ export function TransactionsPage() {
       {selectedTx && (
         <TransactionDetailsModal
           transaction={selectedTx}
+          categories={categories}
           onClose={() => setSelectedTx(null)}
           onSave={handleModalSave}
         />
