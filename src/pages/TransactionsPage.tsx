@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import {
   ArrowDownRight, ArrowUpRight, Plus, Filter, MoreVertical,
   CheckCircle2, Clock, AlertCircle, PiggyBank, Save, X, Info, Expand,
-  Trash2, ChevronLeft, ChevronRight, Search, Upload,
+  Trash2, ChevronLeft, ChevronRight, Search, Upload, ChevronDown, History,
 } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import { formatCurrency } from '../lib/utils'
@@ -211,6 +211,7 @@ export function TransactionsPage() {
   const [activeTab, setActiveTab] = useState<OperationalGroup>('Todos')
   const [showImport, setShowImport] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
+  const [showImportMenu, setShowImportMenu] = useState(false)
 
   // Selected Tx for Modal (can be a real one OR the draft one)
   const [selectedTx, setSelectedTx] = useState<Partial<Title> | null>(null)
@@ -429,12 +430,38 @@ export function TransactionsPage() {
           >
             {hasFilters ? 'Filtros ativos' : 'Filtros'}
           </Button>
-          <Button variant="secondary" className="w-full sm:w-auto" icon={<Upload size={15}/>} onClick={() => setShowImport(true)}>
-            Importar Extrato
-          </Button>
-          <Button variant="secondary" className="w-full sm:w-auto" onClick={() => setShowHistory(true)}>
-            Extratos Importados
-          </Button>
+          <div className="relative w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={() => setShowImportMenu(p => !p)}
+              onBlur={() => setTimeout(() => setShowImportMenu(false), 150)}
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-50 sm:w-auto"
+            >
+              <Upload size={15} />
+              Extrato
+              <ChevronDown size={14} className={`transition-transform ${showImportMenu ? 'rotate-180' : ''}`} />
+            </button>
+            {showImportMenu && (
+              <div className="absolute right-0 top-full z-20 mt-1 w-52 rounded-xl border border-stone-200 bg-white py-1 shadow-lg">
+                <button
+                  type="button"
+                  onMouseDown={() => { setShowImportMenu(false); setShowImport(true) }}
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-stone-700 hover:bg-stone-50"
+                >
+                  <Upload size={14} className="text-stone-400" />
+                  Importar extrato
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={() => { setShowImportMenu(false); setShowHistory(true) }}
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-stone-700 hover:bg-stone-50"
+                >
+                  <History size={14} className="text-stone-400" />
+                  Ver extratos importados
+                </button>
+              </div>
+            )}
+          </div>
           <Button variant="primary" className="w-full sm:w-auto" icon={<Plus size={15}/>} onClick={() => { setIsCreating(true); setSelectedTx(null); }}>
             Novo Lançamento
           </Button>
