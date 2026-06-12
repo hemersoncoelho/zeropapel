@@ -11,6 +11,7 @@ import { usePermission } from '../hooks/usePermission'
 import { supabase } from '../lib/supabase'
 import type { Title, TransactionDirection, TransactionStatus, OperationalGroup, Category } from '../types/finance'
 import { ImportExtratoModal } from '../components/transactions/ImportExtratoModal'
+import { ImportHistoryModal } from '../components/transactions/ImportHistoryModal'
 
 const PAGE_SIZE = 30
 
@@ -196,7 +197,7 @@ function TransactionDetailsModal({
 
 
 export function TransactionsPage() {
-  const { activeCompany } = useAuth()
+  const { activeCompany, user } = useAuth()
   
   const [data, setData] = useState<Title[]>([])
   const [loading, setLoading] = useState(true)
@@ -209,6 +210,7 @@ export function TransactionsPage() {
   
   const [activeTab, setActiveTab] = useState<OperationalGroup>('Todos')
   const [showImport, setShowImport] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
 
   // Selected Tx for Modal (can be a real one OR the draft one)
   const [selectedTx, setSelectedTx] = useState<Partial<Title> | null>(null)
@@ -429,6 +431,9 @@ export function TransactionsPage() {
           </Button>
           <Button variant="secondary" className="w-full sm:w-auto" icon={<Upload size={15}/>} onClick={() => setShowImport(true)}>
             Importar Extrato
+          </Button>
+          <Button variant="secondary" className="w-full sm:w-auto" onClick={() => setShowHistory(true)}>
+            Extratos Importados
           </Button>
           <Button variant="primary" className="w-full sm:w-auto" icon={<Plus size={15}/>} onClick={() => { setIsCreating(true); setSelectedTx(null); }}>
             Novo Lançamento
@@ -758,11 +763,21 @@ export function TransactionsPage() {
       )}
 
       {/* MODAL DE IMPORTAÇÃO DE EXTRATO */}
-      {showImport && activeCompany && (
+      {showImport && activeCompany && user && (
         <ImportExtratoModal
           companyId={activeCompany.id}
+          userId={user.id}
           onClose={() => setShowImport(false)}
           onImported={() => { setShowImport(false); fetchTransactions() }}
+        />
+      )}
+
+      {/* MODAL DE HISTÓRICO DE EXTRATOS */}
+      {showHistory && activeCompany && (
+        <ImportHistoryModal
+          companyId={activeCompany.id}
+          onClose={() => setShowHistory(false)}
+          onDeleted={() => fetchTransactions()}
         />
       )}
 

@@ -62,6 +62,7 @@ export interface Title {
   contact_id?: string | null
   category_id?: string | null
   bank_account_id?: string | null
+  import_id?: string | null
   installments_count?: number
   current_installment?: number
   parent_id?: string | null // For installments grouping
@@ -71,4 +72,13 @@ export interface Title {
   installments?: number
   created_at: string
   updated_at: string
+}
+
+export interface StatementImport {
+  id: string
+  company_id: string
+  file_name: string
+  imported_at: string
+  transaction_count: number
+  created_by: string | null
 }

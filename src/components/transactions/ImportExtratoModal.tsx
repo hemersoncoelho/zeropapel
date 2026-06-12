@@ -16,6 +16,7 @@ interface ParsedRow {
 
 interface ImportExtratoModalProps {
   companyId: string
+  userId: string
   onClose: () => void
   onImported: () => void
 }
@@ -111,7 +112,7 @@ function parseCSV(text: string): ParsedRow[] {
   return results
 }
 
-export function ImportExtratoModal({ companyId, onClose, onImported }: ImportExtratoModalProps) {
+export function ImportExtratoModal({ companyId, userId, onClose, onImported }: ImportExtratoModalProps) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [rows, setRows] = useState<ParsedRow[]>([])
   const [fileName, setFileName] = useState('')
@@ -165,6 +166,24 @@ export function ImportExtratoModal({ companyId, onClose, onImported }: ImportExt
     if (selectedRows.length === 0) return
     setImporting(true)
     setError('')
+
+    const { data: importRecord, error: importErr } = await supabase
+      .from('statement_imports')
+      .insert({
+        company_id: companyId,
+        file_name: fileName,
+        transaction_count: selectedRows.length,
+        created_by: userId,
+      })
+      .select('id')
+      .single()
+
+    if (importErr || !importRecord) {
+      setError(`Erro ao registrar extrato: ${importErr?.message}`)
+      setImporting(false)
+      return
+    }
+
     const payload = selectedRows.map(r => ({
       company_id: companyId,
       description: r.description,
@@ -172,13 +191,17 @@ export function ImportExtratoModal({ companyId, onClose, onImported }: ImportExt
       amount: r.amount,
       due_date: r.date,
       status: 'paid' as const,
+      import_id: importRecord.id,
     }))
-    const { error: err } = await supabase.from('transactions').insert(payload)
-    if (err) {
-      setError(`Erro ao importar: ${err.message}`)
+
+    const { error: txErr } = await supabase.from('transactions').insert(payload)
+    if (txErr) {
+      await supabase.from('statement_imports').delete().eq('id', importRecord.id)
+      setError(`Erro ao importar: ${txErr.message}`)
       setImporting(false)
       return
     }
+
     setImportedCount(selectedRows.length)
     setDone(true)
     setImporting(false)
