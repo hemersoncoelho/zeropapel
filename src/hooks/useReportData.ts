@@ -47,7 +47,7 @@ export function useReportData(
     setError(null)
 
     try {
-    const [ovRes, tsRes, grRes, catRes, rxRes] = await Promise.all([
+    const [ovRes, tsRes, grRes, rxRes, catRes] = await Promise.all([
       supabase.rpc('get_report_overview', {
         p_company_id: companyId,
         p_date_from:  dateFrom,
@@ -64,20 +64,21 @@ export function useReportData(
         p_date_from:  dateFrom,
         p_date_to:    dateTo,
       }),
-      supabase.rpc('get_report_by_category', {
-        p_company_id: companyId,
-        p_date_from:  dateFrom,
-        p_date_to:    dateTo,
-      }),
       supabase.rpc('get_report_recent_transactions', {
         p_company_id: companyId,
         p_date_from:  dateFrom,
         p_date_to:    dateTo,
         p_limit:      20,
       }),
+      // best-effort: não bloqueia o dashboard se a função ainda não existe
+      supabase.rpc('get_report_by_category', {
+        p_company_id: companyId,
+        p_date_from:  dateFrom,
+        p_date_to:    dateTo,
+      }),
     ])
 
-    const firstError = [ovRes.error, tsRes.error, grRes.error, catRes.error, rxRes.error].find(Boolean)
+    const firstError = [ovRes.error, tsRes.error, grRes.error, rxRes.error].find(Boolean)
     if (firstError) {
       setError(`Erro ao carregar relatório: ${firstError.message}`)
       setLoading(false)
